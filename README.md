@@ -86,7 +86,7 @@ lerobot-record \
   --display_data=true
 ```
 
-![录制配置](media/record_config.jpg)
+<img src="media/record_config.jpg" alt="录制配置" width="560">
 
 采集演示：
 
@@ -146,7 +146,7 @@ lerobot-train \
   --batch_size=6
 ```
 
-![ACT 训练曲线](media/act_train_curve.png)
+<img src="media/act_train_curve.png" alt="ACT 训练曲线" width="700">
 
 **真机推理：**
 
@@ -214,7 +214,7 @@ lerobot-train \
 > `--rename_map` 把数据集的相机键名映射到 checkpoint 期望的 `camera1/camera2`；
 > `--policy.empty_cameras=1` 补齐相机槽位。微调和推理时都要带上。
 
-![SmolVLA 训练曲线](media/smolvla_train_curve.png)
+<img src="media/smolvla_train_curve.png" alt="SmolVLA 训练曲线" width="700">
 
 **真机推理：**
 
