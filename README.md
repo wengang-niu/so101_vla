@@ -313,111 +313,39 @@ lerobot-train \
 
 # 我的 miniVLA
 
-> 从零实现一个小型 VLA（<25M 参数），把论文里的每个模块变成自己写过的代码；
-> 并在它上面做持续学习方向的探索。当前状态：方案思路先行，代码随后开工。
+> 从零实现的小型 VLA（<25M 参数）。这一章只讲算法思路。
 
-## 思路
+## 思路一：从观测到动作
 
-- **为什么从零攒**：SmolVLA / pi0.5 的论文结构已经清楚，缺的是把视觉编码、语言条件化、多模态融合、动作生成、推理循环逐个亲手实现一遍——mini-VLA 是论文到代码的最短路径。
-- **为什么做小**：<25M 参数（ViT-tiny + 小型融合 transformer），单卡轻松训练、8GB 内从容部署；也是持续学习消融的廉价试验床。
-- **一条代码路径**：实现为 LeRobot `PreTrainedPolicy` 子类，`lerobot-train` → `lerobot-eval`（PushT / Meta-World）→ `lerobot-rollout` 真机部署，同一套代码。
+```mermaid
+flowchart LR
+    A["看到的：双相机图像<br/>听到的：任务一句话<br/>知道的：关节当前位置"] --> B["编码成 token"]
+    B --> C["50 个『提问槽』逐个回答：<br/>未来第 i 步该做什么？<br/>（对图像、语言、关节状态做注意力）"]
+    C --> D["flow matching：不直接回归动作，<br/>而是学一个速度场，从噪声里<br/>沿速度场『流』出 50 步动作块"]
+    D --> E["时序集成平滑后执行<br/>执行几步回来重新生成（闭环）"]
+```
 
-## 设计
+**flow matching 的意思**：训练时把真实动作块和纯噪声按比例插值，学"从噪声流向真实动作块"的方向（速度场）；推理时从纯噪声出发，沿速度场积分约 10 步，就"流"到一个合理动作块。多个都合理的行为（多模态）由速度场自然表达，不需要额外的隐变量。
 
-### 整体架构（一次前向：观测 → 动作块）
+## 思路二：学新任务，不忘旧技能（持续学习）
 
 ```mermaid
 flowchart TB
-    IM["图像观测：top + wrist 双相机<br/>每路 [B, 3, 224, 224]"]
-    TXT["任务文本<br/>如 Put the toy on the plate"]
-    STATE["关节状态 qpos [B, 6]"]
-
-    subgraph ENC["① 编码"]
-        direction LR
-        VIT["视觉编码器 ViT-tiny<br/>两相机各自 patch embed，加相机 ID 嵌入<br/>→ 视觉 token [B, N, D]"]
-        LANG["语言编码器：小型 transformer<br/>→ 定长 16 语言 token [B, 16, D]"]
-    end
-
-    FUS["② 融合<br/>50 个可学习 action-query token（每个对应未来一步）<br/>对「视觉 + 语言 + qpos」做 cross-attention<br/>pi0 式 decoder block × 4<br/>→ 上下文向量 [B, 50, D]"]
-
-    subgraph HEAD["③ 动作头：flow matching"]
-        direction TB
-        NOISE["当前噪声动作块 x_t [B, 50, 6]"]
-        VEL["速度场网络 v̂(x_t, t, 上下文)<br/>预测每个时刻的动作方向"]
-        INT["Euler 积分约 10 步<br/>x_next = x + v̂ · dt"]
-    end
-
-    OUT["④ 输出<br/>动作块 [B, 50, 6] = 50 步 × 6 关节<br/>→ 时序集成平滑 → 30Hz 执行"]
-
-    IM --> VIT
-    TXT --> LANG
-    VIT --> FUS
-    LANG --> FUS
-    STATE --> FUS
-    FUS --> VEL
-    NOISE --> VEL
-    VEL --> INT
-    INT --> OUT
+    TS["任务流：任务 1 → 任务 2 → 任务 3 → …"]
+    TS --> NEW["来一个新任务"]
+    NEW --> EX["只训一个轻量 LoRA 专家<br/>旧任务的专家原封不动 = 知识隔离"]
+    NEW --> G{"这个 episode 够新颖 / 有冲突吗？"}
+    G -->|是| MEM[("锚点记忆库：只存关键 episode")]
+    G -->|否| SKIP["丢掉，不污染记忆"]
+    MEM -.训练新专家时回放，抵消遗忘.-> EX
+    EX --> ROUTE["按当前任务选用 / 组合专家"]
+    BASE["冻结基座（永远不动）"] --> ROUTE
+    ROUTE --> ACT["输出动作"]
 ```
 
-### flow matching 动作头：训练 vs 推理
-
-```mermaid
-flowchart TB
-    subgraph T["训练（数据集里有真实动作块）"]
-        GT["真实动作块 x1"]
-        IP["随机采 t，线性插值<br/>x_t = (1 - t)·x0 + t·x1，其中 x0 是纯噪声<br/>监督目标：速度 = x1 - x0"]
-        LOSS["损失 = 预测速度与目标速度的 MSE"]
-    end
-    subgraph I["推理（没有真值）"]
-        Z["从纯噪声 x0 出发"]
-        ST["约 10 步 Euler 积分<br/>每步用速度场 v̂ 修正方向"]
-        ACT["落到动作块 x1，交给时序集成"]
-    end
-    GT --> IP --> LOSS
-    Z --> ST --> ACT
-```
-
-一句话：**训练**是"给噪声和真值的插值，学它们之间的速度方向"；**推理**是"从噪声出发，沿着学到的速度场走 10 步，就走到一个合理动作块"。
-
-### 组件表
-
-| 组件 | 方案 |
-|---|---|
-| 视觉编码 | ViT-tiny，多相机 token（含相机 ID 嵌入） |
-| 语言编码 | 小型 transformer，定长 prefix token |
-| 融合 | action-query token 对视觉+语言做 cross-attention（pi0 式微缩版） |
-| 动作头 | flow matching 为主（可换 diffusion / 离散 token 做对比） |
-| 输出 | 动作分块（action chunking）+ 时序集成 |
-
-## 进阶方向：持续学习（continual / lifelong learning）
-
-**为什么**：任务级 LoRA 专家累积（CORAL / CLARE 式）与选择性回放（Memory-Anchors 式）尚未被耦合；真机持续学习 benchmark 也极度稀缺。且算力契合——LoRA 训练 <24GB、部署 ≤8GB，严格落在硬预算内。
-
-1. **任务级 LoRA 专家累积**：每学一个新任务，在冻结基座上训一个 rank-16 LoRA 专家；轻量路由器按任务嵌入选择/组合——旧任务知识隔离在各自专家里，抗遗忘。
-2. **新颖度门控回放**：记忆缓冲只存"锚点" episode，写入由新颖度/冲突分数把关；训练当前专家时用缓冲 + 新数据回放。**"专家隔离 × 门控回放"的耦合是主打创新点**。
-3. **同接口对照组**：联合训练、经验回放（ER，需精心配置——等算力下它才是强基线）、仅 LoRA、零梯度上下文因果记忆（Zeva 式）——保证结论可信。
-
-## 评测
-
-- **常规**：PushT / Meta-World 仿真 + 真机 SO-101，真机成功率口径沿用上一章的评测习惯（固定位姿、10 次试验、超时计失败）。
-- **持续学习**：MuJoCo SO-101 twin 上建 2–5 任务顺序任务流（每任务 30 eps 遥操作数据），固定顺序与种子；指标取逐任务成功率、遗忘 / BWT、正向迁移，OOD 指令鲁棒性作次要轴。
-- **交付物**：消融表（joint / ER / LoRA-only / +门控回放 / +ICCL）+ 真机持续学习 benchmark 协议本身（稀缺贡献）。
-
-## 路线
-
-| 阶段 | 内容 | 预估 |
-|---|---|---|
-| 1 | mini-VLA 从零实现（组件 + 单测 + PushT 跑通） | 1.5–2 周 |
-| 2 | 持续学习（LoRA 专家 + 门控回放 + 任务流 benchmark） | 2–3 周 |
-| 3 | 部署：ONNX fp16/int8 + 8GB 卡延迟/显存表 | 1 周 |
-| 4 | 补充：pi0.5-LoRA LIBERO 训练记录（对标 96.9–97.5%） | 持续 |
-
-## 参考
-
-CORAL（arXiv 2603.09298）、CLARE（arXiv 2601.09512）、Memory Anchors（arXiv 2608.26545）、
-真机 10 任务 ER>联合训练（arXiv 2605.26820）、OOD 漂移负结果（arXiv 2611.31511）、
-Zeva 上下文因果学习（arXiv 2608.30880）、InteractVLA / RSI（arXiv 2611.22584）
+- **基座永远冻结**：变强只发生在新增的小专家和锚点库上；
+- **知识隔离**：每个任务的旧技能存在自己的 LoRA 专家里，不怕被新任务覆盖；
+- **只记关键经验**：回放只挑够新颖 / 有冲突的 episode，用最少的记忆抵消遗忘。
 
 ## License
 
