@@ -1,97 +1,316 @@
-# so101_vla
+# SO-101 VLA 开发记录
 
-**经典 VLA（视觉-语言-动作）算法复现实录（面试展示用）+ 持续学习 VLA 自研路线**——训练 ≤48GB 显存，部署在自攒 SO-101 机械臂（8GB 显卡）上。
+> 用 LeRobot 在自攒 SO-101 机械臂上完成 VLA 全链路开发的展示记录：
+> 硬件搭建 → 标定 → 遥操作 → 数据采集 → 训练（ACT / SmolVLA / pi0）→ 真机推理。
+> 训练任务：**"Put the toy on the plate"**（把玩具放到盘子上）。
 
-本仓库有两个目标：
-
-1. **经典 VLA 算法复现，记录成文档展示。** ACT、SmolVLA、pi0 的完整训练/推理配方、SO-101 真机实操、结果与踩坑复盘，每篇附"组件拆解"——按面试问答的方式把算法讲透。见 [`docs/repros/`](docs/repros/)。
-2. **自研/改进方法（面试 + 研究）。** 创新方向为**持续学习（continual / lifelong learning）**：任务级 LoRA 专家累积 + 新颖度门控回放，在 MuJoCo + 真机 SO-101 顺序任务流上建 benchmark。另有一个从零实现的 mini-VLA 作为学习载体，每个组件（编码器 → 融合 → 动作头 → 推理循环）都为"能讲清楚"而写。目前自研部分先出计划，见 [`docs/plans/`](docs/plans/)。
-
-一切基于 [LeRobot](https://github.com/huggingface/lerobot) 技术栈，**同一条代码路径**覆盖 `lerobot-train` → `lerobot-eval`（PushT / Meta-World / LIBERO）→ `lerobot-rollout` 真机部署。
-
-## 现状
-
-早期开发中。硬约束：
-
-| 约束 | 数值 |
+| 项目 | 内容 |
 |---|---|
-| 训练预算 | ≤48GB 显存（本地 RTX 3090 + 云 GPU，配方可迁移） |
-| 真机推理 | ≤8GB 显存（x86 主机 + RTX 4060 级显卡） |
-| 机械臂 | 自攒 SO-101（LeRobot 生态），腕部 + 顶部双相机 |
-| 仿真 | MuJoCo（LeRobot SO-101 twin，`lerobot-eval` 跑 LIBERO / Meta-World） |
-| License | Apache-2.0（代码）。受限制的第三方权重一律不转分发，见下文 |
+| 机械臂 | SO-101 leader + follower（自攒，Feetech STS3215 舵机） |
+| 相机 | 腕部 + 顶部双路 USB 相机，640×480 @ 30fps |
+| 数据 | `niuwengang123/lerobot_dataset_put_toy`，40 条遥操作 episode，LeRobotDataset v3.0 |
+| 算法 | ACT（训练+真机）、SmolVLA（从零+微调+真机）、pi0（全量+LoRA） |
+| 框架 | LeRobot（源码安装）+ wandb / nvitop 监控 |
 
-## 复现展示
+---
 
-| 算法 | 记录内容 | 文档 |
-|---|---|---|
-| **ACT** | 训练 + SO-101 真机（"Put the toy on the plate"），CVAE/动作分块拆解 | [docs/repros/act.md](docs/repros/act.md) |
-| **SmolVLA** | 从零训练 + 基座微调配方、相机名映射、fp16 部署数字 | [docs/repros/smolvla.md](docs/repros/smolvla.md) |
-| **pi0** | 从 `lerobot/pi0_base` 全量训练 + LoRA 微调配方 | [docs/repros/pi0.md](docs/repros/pi0.md) |
-
-数据采集与硬件搭建（标定、遥操作、LeRobotDataset v3.0、时间对齐）记录在
-[docs/experiments/data_pipeline.md](docs/experiments/data_pipeline.md)。
-真机评测协议在 [docs/experiments/real_eval_protocol.md](docs/experiments/real_eval_protocol.md)。
-
-## 路线图
-
-| 版本 | 主题 |
-|---|---|
-| **v0.1** | 脚手架 + 经典复现展示文档 + 数据管线记录 + 真机评测协议 |
-| **v0.2** | 从零 mini-VLA（flow-matching 动作头）+ 面试文档系列 |
-| **v0.3** | 持续学习自研轨：LoRA 专家累积 + 门控回放 + 真机持续学习 benchmark |
-| **v0.4** | 部署强化：ONNX fp16/int8、延迟表、Zenoh 远程推理 |
-| v0.5+ | pi0.5-LoRA LIBERO 训练记录、博客系列、可选基线行 |
-
-## 目录结构
-
-```
-docs/
-  repros/            # ★ 经典 VLA 复现记录（配方、结果、面试拆解）
-  experiments/       # 数据管线、真机评测协议、实验记录
-  interview/         # 面试问答文档（旗舰：从零构建一个 VLA）
-  plans/             # 自研计划（持续学习路线）
-  architecture.md    # 设计规则
-src/so101_vla/
-  policies/          # 从零 mini-VLA（LeRobot PreTrainedPolicy 子类）
-  modules/           # 积木：视觉、语言、融合、动作头、时序
-  continual/         # 创新轨：ContinualAdapter 接口 + 策略
-  integrations/      # LeRobot 薄封装（不拷代码）
-  deployment/        # ONNX 导出、量化、延迟基准
-configs/train/       # 每个配方一个 YAML，头部带 # GPU-mem 预算注释
-scripts/             # 评测 / rollout 脚本
-benchmarks/          # 结果汇总（JSONL + markdown，永不提交权重）
-tests/               # 单元测试 + 密钥扫描
-```
-
-## 快速开始
+## 1. 软件环境
 
 ```bash
-# 1. 环境（Python >= 3.10）
-python -m venv .venv && source .venv/bin/activate
-pip install -e ".[dev]"
-
-# 2. 冒烟测试（无需 GPU）
-pytest
-
-# 3. 阅读复现记录
-open docs/repros/act.md
-
-# 4. 真机 rollout 并记录成功率（训练好策略之后）
-bash scripts/eval_real_so101.sh <policy>
+conda create -y -n lerobot python=3.12
+conda activate lerobot
+git clone https://github.com/huggingface/lerobot.git
+cd lerobot
+pip install -e ".[feetech]"
 ```
 
-本机训练硬件：1 张 RTX 3090（24GB）本地 + 云 GPU 跑大配方。
+环境自检：
 
-## License 与第三方权重
+```bash
+python -c "
+import torch, lerobot
+print('CUDA available:', torch.cuda.is_available())
+print('CUDA version:', torch.version.cuda)
+print('Lerobot version:', lerobot.__version__)
+"
+```
 
-本仓库代码为 **Apache-2.0**。不 vendor 任何受限制许可的代码或权重
-（openpi / Gemma ToU、OpenVLA / Llama-2 社区许可、GR00T / NVIDIA Open Model License、
-Zeva / OpenMDW）。使用此类模型时（如 pi0 配方经由 LeRobot），按其自身条款运行，
-权重绝不在此仓库转分发。
+## 2. 舵机标定
 
-## 安全
+```bash
+ls /dev/ttyACM*
 
-**绝不提交凭据。** CI 会扫描密钥（`tests/test_no_secrets.py` + gitleaks pre-commit）。
-Hugging Face / W&B 一律用 `hf auth login`、`wandb login` 或环境变量——文档中的命令
-全部使用占位符。
+lerobot-calibrate \
+    --teleop.type=so101_leader \
+    --teleop.port=/dev/ttyACM0 \
+    --teleop.id=g_leader_arm
+
+lerobot-calibrate \
+    --robot.type=so101_follower \
+    --robot.port=/dev/ttyACM1 \
+    --robot.id=g_follower_arm
+```
+
+## 3. 遥操作
+
+```bash
+lerobot-teleoperate \
+  --robot.type=so101_follower \
+  --robot.port=/dev/ttyACM1 \
+  --robot.id=g_follower_arm \
+  --teleop.type=so101_leader \
+  --teleop.port=/dev/ttyACM0 \
+  --teleop.id=g_leader_arm
+```
+
+## 4. 数据采集
+
+采集质量参考：[what makes a good dataset](https://huggingface.co/blog/lerobot-datasets#what-makes-a-good-dataset)（复位位姿一致、背景干净、成功轨迹覆盖完整）。
+
+```bash
+lerobot-record \
+  --robot.type=so101_follower \
+  --robot.port=/dev/ttyACM1 \
+  --robot.id=g_follower_arm \
+  --robot.cameras='{"wrist":{"type":"opencv","index_or_path":"/dev/video4","width":640,"height":480,"fps":30,"fourcc":"MJPG"},"top":{"type":"opencv","index_or_path":"/dev/video0","width":640,"height":480,"fps":30,"fourcc":"MJPG"}}' \
+  --teleop.type=so101_leader \
+  --teleop.port=/dev/ttyACM0 \
+  --teleop.id=g_leader_arm \
+  --dataset.repo_id=niuwengang123/lerobot_dataset_put_toy \
+  --dataset.root=$DATA_ROOT/lerobot_dataset_put_toy \
+  --dataset.num_episodes=40 \
+  --dataset.single_task="Put the toy on the plate" \
+  --dataset.push_to_hub=false \
+  --dataset.episode_time_s=60 \
+  --dataset.reset_time_s=10 \
+  --display_data=true
+```
+
+![录制配置](media/record_config.jpg)
+
+采集演示：
+
+<video src="https://raw.githubusercontent.com/wengang-niu/so101_vla/main/media/data_collection.mp4" controls width="720"></video>
+（[视频文件](media/data_collection.mp4)）
+
+## 5. 数据格式（LeRobotDataset v3.0）
+
+- **`data/`** — 数值：每帧一行 parquet（action、observation.state、时间戳、各种 index）
+- **`videos/`** — 图像：每个相机一个子目录，帧编进 mp4（av1/yuv420p/30fps）
+- **`meta/`** — 描述：`info.json`（身份信息）、`stats.json`（统计）、`tasks.parquet`（任务）、`episodes/`（每集元数据）
+
+## 6. 数据可视化
+
+- https://huggingface.co/spaces/lerobot/visualize_dataset
+- http://io-ai.tech/lerobot
+
+## 7. Hugging Face 上传 / 下载
+
+```bash
+pip install huggingface_hub
+hf auth login        # 交互式登录，勿硬编码 token
+hf upload niuwengang123/lerobot_dataset_put_toy ./data/ --repo-type=dataset
+hf download --repo-type dataset niuwengang123/lerobot_dataset_put_toy --local-dir ./data
+```
+
+## 8. 训练监控
+
+```bash
+pip install wandb && wandb login   # 交互式登录，勿硬编码 API key
+pip install nvitop                 # 盯显存 / 利用率
+```
+
+---
+
+## 9. 训练与推理
+
+### 9.1 ACT
+
+**训练：**
+
+```bash
+lerobot-train \
+  --dataset.repo_id=niuwengang123/lerobot_dataset_put_toy \
+  --dataset.root=$DATA_ROOT/lerobot_dataset_put_toy \
+  --dataset.revision=main \
+  --dataset.streaming=false \
+  --policy.type=act \
+  --output_dir=$OUTPUT_DIR/toy/act/ \
+  --job_name=toy \
+  --policy.device=cuda \
+  --wandb.enable=true \
+  --wandb.project=toy_project_act \
+  --policy.push_to_hub=false \
+  --steps=20000 \
+  --batch_size=6
+```
+
+![ACT 训练曲线](media/act_train_curve.png)
+
+**真机推理：**
+
+```bash
+lerobot-rollout \
+  --strategy.type=base \
+  --robot.type=so101_follower \
+  --robot.port=/dev/ttyACM1 \
+  --robot.cameras='{"wrist":{"type":"opencv","index_or_path":"/dev/video0","width":640,"height":480,"fps":30,"fourcc":"MJPG"},"top":{"type":"opencv","index_or_path":"/dev/video4","width":640,"height":480,"fps":30,"fourcc":"MJPG"}}' \
+  --robot.id=g_follower_arm \
+  --display_data=true \
+  --task="Put the toy on the plate" \
+  --duration=10000 \
+  --policy.path=$OUTPUT_DIR/toy/act/checkpoints/020000/pretrained_model
+```
+
+真机演示（ACT）：
+
+<video src="https://raw.githubusercontent.com/wengang-niu/so101_vla/main/media/act_infer.mp4" controls width="720"></video>
+（[视频文件](media/act_infer.mp4)）
+
+### 9.2 SmolVLA
+
+**训练（全量）：**
+
+```bash
+lerobot-train \
+  --dataset.repo_id=niuwengang123/lerobot_dataset_put_toy \
+  --dataset.root=$DATA_ROOT/lerobot_dataset_put_toy \
+  --dataset.revision=main \
+  --dataset.streaming=false \
+  --policy.type=smolvla \
+  --output_dir=$OUTPUT_DIR/lerobot/output \
+  --job_name=toy_smolvla \
+  --policy.device=cuda \
+  --wandb.enable=true \
+  --wandb.project=toy_project_smolvla \
+  --policy.push_to_hub=false \
+  --steps=40000 \
+  --batch_size=8
+```
+
+**训练（从 `lerobot/smolvla_base` 微调）：**
+
+```bash
+lerobot-train \
+  --policy.path=lerobot/smolvla_base \
+  --dataset.repo_id=niuwengang123/lerobot_dataset_put_toy \
+  --dataset.root=$DATA_ROOT/lerobot_dataset_put_toy \
+  --dataset.revision=main \
+  --dataset.streaming=false \
+  --output_dir=$OUTPUT_DIR/lerobot/output \
+  --job_name=toy_smolvla \
+  --policy.device=cuda \
+  --policy.empty_cameras=1 \
+  --rename_map='{"observation.images.top": "observation.images.camera1", "observation.images.wrist": "observation.images.camera2"}' \
+  --wandb.enable=true \
+  --wandb.project=toy_project_smolvla \
+  --policy.push_to_hub=false \
+  --steps=40000 \
+  --batch_size=8
+```
+
+> `--rename_map` 把数据集的相机键名映射到 checkpoint 期望的 `camera1/camera2`；
+> `--policy.empty_cameras=1` 补齐相机槽位。微调和推理时都要带上。
+
+![SmolVLA 训练曲线](media/smolvla_train_curve.png)
+
+**真机推理：**
+
+```bash
+lerobot-rollout \
+  --strategy.type=base \
+  --robot.type=so101_follower \
+  --robot.port=/dev/ttyACM1 \
+  --robot.cameras='{"wrist":{"type":"opencv","index_or_path":"/dev/video4","width":640,"height":480,"fps":30,"fourcc":"MJPG"},"top":{"type":"opencv","index_or_path":"/dev/video0","width":640,"height":480,"fps":30,"fourcc":"MJPG"}}' \
+  --robot.id=g_follower_arm \
+  --rename_map='{"observation.images.top":"observation.images.camera1","observation.images.wrist":"observation.images.camera2"}' \
+  --display_data=false \
+  --task="Put the toy on the plate" \
+  --duration=10000 \
+  --policy.path=$OUTPUT_DIR/model/smolvla_040000/040000/pretrained_model
+```
+
+真机演示（SmolVLA）：
+
+<video src="https://raw.githubusercontent.com/wengang-niu/so101_vla/main/media/smolvla_infer.mp4" controls width="720"></video>
+（[视频文件](media/smolvla_infer.mp4)）
+
+### 9.3 pi0
+
+**训练（全量）：**
+
+```bash
+# 依赖
+pip install -e ".[pi]"
+pip install 'lerobot[dataset]'
+pip install 'lerobot[training]'
+```
+
+```bash
+lerobot-train \
+  --dataset.repo_id=niuwengang123/lerobot_dataset_put_toy \
+  --dataset.revision=main \
+  --dataset.root=$DATA_ROOT/lerobot_dataset_put_toy \
+  --dataset.streaming=false \
+  --policy.type=pi0 \
+  --output_dir=$OUTPUT_DIR/toy_pi0 \
+  --job_name=toy_pi0 \
+  --policy.pretrained_path=lerobot/pi0_base \
+  --policy.compile_model=true \
+  --policy.gradient_checkpointing=true \
+  --policy.dtype=bfloat16 \
+  --policy.freeze_vision_encoder=false \
+  --policy.train_expert_only=false \
+  --steps=50000 \
+  --policy.device=cuda \
+  --policy.push_to_hub=false \
+  --wandb.enable=true \
+  --wandb.project=toy_project_pi_0 \
+  --batch_size=8
+```
+
+**训练（LoRA 微调）：**
+
+```bash
+pip install 'lerobot[peft]'
+```
+
+```bash
+lerobot-train \
+  --dataset.repo_id=niuwengang123/lerobot_dataset_put_toy \
+  --dataset.revision=main \
+  --dataset.root=$DATA_ROOT/lerobot_dataset_put_toy \
+  --dataset.streaming=false \
+  --policy.type=pi0 \
+  --output_dir=$OUTPUT_DIR/toy_pi0_lora \
+  --job_name=toy_pi0_lora \
+  --policy.pretrained_path=lerobot/pi0_base \
+  --policy.compile_model=false \
+  --policy.gradient_checkpointing=true \
+  --policy.dtype=bfloat16 \
+  --steps=3000 \
+  --policy.device=cuda \
+  --policy.push_to_hub=false \
+  --wandb.enable=true \
+  --wandb.project=toy_project_pi_0 \
+  --batch_size=8 \
+  --peft.method_type=LORA \
+  --peft.r=16 \
+  --peft.lora_alpha=16
+```
+
+> 显存技巧：`gradient_checkpointing` + `bfloat16` +（可选）`train_expert_only` 是
+> 3B 级 pi0 塞进 48GB 单机的关键；LoRA（r=16）进一步把可训练参数压到 ~1%。
+> **真机推理暂略**（待补：pi0 bf16 推理 >8GB，需 int8 / ONNX / 远程推理）。
+
+---
+
+## 下一步
+
+- 补齐 pi0 真机推理记录与三个算法的正式成功率表
+- 自研方向：VLA 持续学习（任务级 LoRA 专家累积 + 新颖度门控回放 + 真机持续学习 benchmark）
+- 部署侧：ONNX fp16/int8 导出，8GB 显卡实时推理
+
+## License
+
+Apache-2.0（代码与文档）。pi0 等第三方权重受其自身许可约束（Gemma ToU），不随仓库分发。
