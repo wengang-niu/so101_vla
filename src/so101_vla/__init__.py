@@ -1,3 +1,3 @@
-"""so101_vla: educational VLA reproductions and continual-learning research on SO-101."""
+"""so101_vla：SO-101 机械臂上的 VLA 复现记录与持续学习研究。"""
 
 __version__ = "0.1.0.dev0"

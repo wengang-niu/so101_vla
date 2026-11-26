@@ -1,1 +1,1 @@
-"""Shared helpers: seeding, logging, secret guards."""
+"""公共工具：随机种子、日志、密钥防护。"""

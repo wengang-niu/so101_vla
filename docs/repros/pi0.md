@@ -1,38 +1,36 @@
-# pi0 — flow-matching action expert on a VLM backbone
+# pi0 — VLM 基座 + flow-matching 动作专家
 
-> Reproduction record (LeRobot `policy.type=pi0`) · full training + LoRA finetune from
-> `lerobot/pi0_base` on self-collected SO-101 data · inference pending.
-> Paper: Black et al., *π0: A Vision-Language-Action Flow Model for General Robot
-> Control* (Physical Intelligence, 2024) · weights via LeRobot under Gemma Terms of Use
-> (weights are **not** redistributed in this repo).
+> 复现记录（LeRobot `policy.type=pi0`）· 从 `lerobot/pi0_base` 全量训练 + LoRA 微调
+> （自采 SO-101 数据）· 推理待补。
+> 论文：Black et al., *π0: A Vision-Language-Action Flow Model for General Robot
+> Control*（Physical Intelligence，2024）· 权重经 LeRobot 获取，受 Gemma Terms of Use
+> 约束（权重**不在**本仓库转分发）。
 
-## 1. Background
+## 1. 背景
 
-pi0 pairs a PaliGemma-class VLM (≈3B) with a lightweight **action expert** (≈300M) that
-generates action chunks via **flow matching**, trained as a prefix-LM where the expert
-attends to VLM features. It is the strongest open recipe at the "large VLA" tier that a
-single-node budget can still finetune — with memory tricks. pi0.5 (the follow-up,
-covered later on this track) improves long-horizon / language-grounded behavior on the
-same architecture family.
+pi0 把 PaliGemma 级 VLM（≈3B）与轻量**动作专家**（≈300M）配对，动作专家用
+**flow matching** 生成动作块，训练形式是 prefix-LM——专家关注 VLM 特征。它是
+"大 VLA"档位里单机预算还能微调的最强开源配方——靠显存技巧。pi0.5（同架构家族的
+后续工作，本路线后面会记录）在长程/语言落地能力上有提升。
 
-**How interviewers ask it:** "pi0 和 SmolVLA 的区别？action expert 为什么单独训练？
-LoRA 微调 VLA 怎么配？全量微调 48GB 怎么塞进去？" (§6).
+**面试官怎么问：**"pi0 和 SmolVLA 区别？action expert 为什么单独设计？LoRA 微调 VLA
+怎么配？全量微调 48GB 怎么塞进去？"（见 §6。）
 
-## 2. Environment & data
+## 2. 环境与数据
 
 ```bash
-pip install -e ".[pi]"        # pi0 dependencies in LeRobot
+pip install -e ".[pi]"        # LeRobot 的 pi0 依赖
 pip install 'lerobot[dataset]'
 pip install 'lerobot[training]'
-pip install 'lerobot[peft]'   # LoRA finetune only
+pip install 'lerobot[peft]'   # 仅 LoRA 微调需要
 ```
 
-Same SO-101 dataset as [act.md](act.md). Training ran on a cloud GPU node
-(48 GB-class); LoRA finetune also runs on a single RTX 3090.
+数据集与 [act.md](act.md) 相同。全量训练跑在云 GPU 节点（48GB 级）；LoRA 微调在
+单张 RTX 3090 上即可。
 
-## 3. Training recipes
+## 3. 训练配方
 
-### 3.1 Full training (with memory tricks)
+### 3.1 全量训练（带显存技巧）
 
 ```bash
 lerobot-train \
@@ -57,7 +55,7 @@ lerobot-train \
   --batch_size=8
 ```
 
-### 3.2 LoRA finetune
+### 3.2 LoRA 微调
 
 ```bash
 lerobot-train \
@@ -83,52 +81,48 @@ lerobot-train \
   --peft.lora_alpha=16
 ```
 
-| Hyperparameter | Value | Why it matters |
+| 超参 | 取值 | 为什么重要 |
 |---|---|---|
-| `gradient_checkpointing=true` | both | recomputes activations in the backward pass — the single biggest memory lever (~2–3× savings) |
-| `dtype=bfloat16` | both | halves optimizer/activation memory vs fp32; bf16 (not fp16) avoids overflow in the VLM |
-| `compile_model=true` | full only | `torch.compile` kernels; disabled for LoRA because compile + PEFT hooks interact badly |
-| `freeze_vision_encoder=false` | full | full finetune updates the vision tower; freezing it is the lighter alternative |
-| `train_expert_only=false` | full | trains VLM + expert; `true` = expert-only is the cheap mode |
-| `peft.r=16 / lora_alpha=16` | LoRA | rank-16 adapters on attention projections; ~1% of trainable params |
-| steps | 50 000 / 3 000 | LoRA converges in a fraction of the steps |
+| `gradient_checkpointing=true` | 两者 | 反向时重算激活——单项最大的显存杠杆（约省 2–3 倍） |
+| `dtype=bfloat16` | 两者 | 比 fp32 省一半优化器/激活显存；用 bf16 而非 fp16 是为了避免 VLM 溢出 |
+| `compile_model=true` | 仅全量 | `torch.compile` 内核；LoRA 时关掉——compile 与 PEFT 钩子相互干扰 |
+| `freeze_vision_encoder=false` | 全量 | 全量时连视觉塔一起更新；冻住它是更轻的选择 |
+| `train_expert_only=false` | 全量 | 训练 VLM+专家；`true` = 只训专家，最省 |
+| `peft.r=16 / lora_alpha=16` | LoRA | 注意力投影上的 rank-16 适配器，可训练参数约 1% |
+| steps | 50 000 / 3 000 | LoRA 收敛所需步数少一个量级 |
 
-> GPU-mem: full finetune at batch 8 with the tricks above fits a 48 GB node (measured
-> peak to be pinned from the run logs); LoRA finetune peaks well below 24 GB and runs
-> on the RTX 3090. This recipe suite is the repo's "how to fit a 3B VLA into ≤48 GB"
-> interview answer.
+> GPU-mem：全量微调 batch 8 + 上述技巧可放进 48GB 节点（精确峰值待从运行日志钉）；
+> LoRA 微调峰值远低于 24GB，RTX 3090 可跑。这套配方就是本仓库"3B VLA 怎么塞进
+> ≤48GB"的面试答案。
 
-## 4. Inference / real robot — **TODO (recorded gap)**
+## 4. 推理 / 真机 — **待补（已记录的缺口）**
 
-Rollout on SO-101 is **not yet recorded** for pi0 (known gap in my notes). When filled
-in, this section will contain the `lerobot-rollout` command and results. Constraints to
-keep in mind meanwhile:
+pi0 的 SO-101 rollout **尚未记录**（笔记中的已知缺口）。补上后本节会有
+`lerobot-rollout` 命令与结果。先记住几个约束：
 
-- pi0 bf16 inference runs **>8 GB VRAM** — it does not fit the 8 GB real-robot budget
-  out of the box. Options: int8 quantization, ONNX/TensorRT export, or LeRobot's
-  remote-inference split (policy server on cloud GPU, arm-side client). All three are
-  planned on the deployment track.
-- The rollout must use the same dataset-rename conventions as training if cameras are
-  remapped (see [smolvla.md](smolvla.md) §3.2 for the pattern).
+- pi0 bf16 推理 **>8GB 显存**——开箱进不了 8GB 真机预算。可选方案：int8 量化、
+  ONNX/TensorRT 导出、或 LeRobot 的远程推理拆分（策略服务器在云 GPU，臂侧只跑客户端）。
+  三条路都在部署轨计划里。
+- 若训练时做了相机名重映射，rollout 必须沿用同样的约定（模式见
+  [smolvla.md](smolvla.md) §3.2）。
 
-## 5. Results & retrospective
+## 5. 结果与复盘
 
-- Full-train and LoRA runs completed (wandb project `toy_project_pi_0`); loss curves
-  healthy.
-- Pitfalls / lessons:
-  1. `compile_model` + PEFT: disable compile for LoRA runs.
-  2. Watch reserved (not allocated) memory with `nvitop` — fragmentation after long
-     runs can OOM a "fits" config; restart the job between very different recipes.
-  3. Weights come from `lerobot/pi0_base` under Gemma Terms of Use — fine for training
-     locally, but **do not redistribute weights** in this repo.
+- 全量与 LoRA 运行均完成（wandb 项目 `toy_project_pi_0`），loss 曲线健康。
+- 踩坑 / 心得：
+  1. `compile_model` 与 PEFT：LoRA 运行要关 compile。
+  2. 用 `nvitop` 盯 reserved（不是 allocated）显存——长任务后的碎片化可能让"放得下"
+     的配置 OOM；切换差异大的配方前重启任务。
+  3. `lerobot/pi0_base` 权重受 Gemma Terms of Use 约束——本地训练没问题，但**绝不
+     在本仓库转分发权重**。
 
-## 6. Component breakdown (interview answers)
+## 6. 组件拆解（面试答案）
 
-| Component | In pi0 | My one-line answer |
+| 组件 | pi0 里的做法 | 我的一句话回答 |
 |---|---|---|
-| VLM backbone | PaliGemma ~3B | "Language + vision grounding lives in the VLM; it is finetuned jointly or frozen depending on budget." |
-| Action expert | ~300M transformer, flow matching | "A separate lightweight expert predicts the flow-matching velocity field for the action chunk; it attends to VLM KV features like a prefix." |
-| Flow matching loss | MSE on velocity v = x₁ − x₀ | "Same objective as SmolVLA — straight-path flows, ~10 integration steps at inference." |
-| Memory strategy | grad-checkpoint + bf16 + optional expert-only / LoRA | "Three levers: recompute activations, halve precision, shrink trainable params. Together they fit a 3B VLA in ≤48 GB." |
-| LoRA for VLAs | rank-16 on attention projections | "Adapters on the VLM attention layers keep the base frozen — cheap, reversible, and composable per task." |
-| pi0 vs SmolVLA | 3B + 300M expert vs 450M total | "Same architectural idea; SmolVLA is the efficient variant that trains on one consumer GPU and deploys inside 8 GB." |
+| VLM 基座 | PaliGemma ~3B | "语言+视觉落地在 VLM 里；按预算决定联合微调还是冻结。" |
+| 动作专家 | ~300M transformer，flow matching | "独立轻量专家预测动作块的流匹配速度场；像 prefix 一样关注 VLM 的 KV 特征。" |
+| flow matching 损失 | 速度 v=x₁−x₀ 的 MSE | "与 SmolVLA 同一目标——直线路径流，推理约 10 步积分。" |
+| 显存策略 | 梯度检查点 + bf16 + 可选专家-only / LoRA | "三个杠杆：重算激活、减半精度、缩小可训练参数。合起来让 3B VLA 装进 ≤48GB。" |
+| VLA 上的 LoRA | 注意力投影 rank-16 | "在 VLM 注意力层挂适配器，基座冻结——便宜、可逆、按任务可组合。" |
+| pi0 vs SmolVLA | 3B+300M 专家 vs 总计 450M | "同一架构思想；SmolVLA 是高效变体，单张消费级卡可训、8GB 内可部署。" |

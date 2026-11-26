@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "so101-vla"
 version = "0.1.0.dev0"
-description = "Educational reproductions of classic VLA algorithms and continual-learning VLA research on a self-built SO-101 arm (LeRobot + MuJoCo, <=48GB train / <=8GB deploy)"
+description = "经典 VLA 算法复现记录与持续学习 VLA 研究（自攒 SO-101 机械臂，LeRobot + MuJoCo，训练 ≤48GB / 部署 ≤8GB）"
 readme = "README.md"
 license = "Apache-2.0"
 requires-python = ">=3.10"

@@ -1,70 +1,61 @@
-# Self-developed research track — plan (no code yet)
+# 自研研究路线 — 计划（暂不写代码）
 
-> Status: **plan only**. The classic-VLA reproductions in `docs/repros/` are the
-> showcase deliverable; this document is the roadmap for the self-developed method
-> (interview + research direction) that starts after v0.1.
+> 状态：**仅计划**。`docs/repros/` 里的经典 VLA 复现记录是展示交付物；本文档是
+> 自研方法（面试 + 研究方向）的路线图，在 v0.1 之后启动。
 
-## Direction: continual / lifelong learning for VLAs
+## 方向：VLA 的持续学习（continual / lifelong learning）
 
-**Why this direction**
+**为什么选这个方向**
 
-- Interview differentiation: JDs for embodied-AI VLA roles consistently probe
-  "世界模型 / 终身学习 / 自进化" as frontier topics; almost no candidate portfolio has a
-  real continual-learning project on real hardware.
-- Literature gap (verified in the 2025–2026 survey): per-task **LoRA expert
-  accumulation** (CORAL/CLARE-style) and **selective replay** (Memory-Anchors-style)
-  have not been coupled; and real-arm continual-learning benchmarks barely exist
-  (one 10-task benchmark, arXiv 2605.26820, which also shows well-configured
-  experience replay beats joint training under equal compute).
-- Compute fit: LoRA on a SmolVLA-class base (<24 GB train) and base+experts at fp16
-  (≤8 GB deploy) both fit the hard budgets.
+- 面试差异化：具身智能 VLA 岗位的 JD 普遍会追问"世界模型 / 终身学习 / 自进化"等
+  前沿话题；候选人的项目组合里几乎见不到真机上的持续学习项目。
+- 文献缺口（2025–2026 调研已验证）：任务级 **LoRA 专家累积**（CORAL/CLARE 式）与
+  **选择性回放**（Memory-Anchors 式）尚无耦合方案；真机持续学习 benchmark 极度稀缺
+  （目前只有一个 10 任务真机 benchmark，arXiv 2605.26820——该文还证明等算力下
+  精心配置的经验回放优于联合训练）。
+- 算力契合：SmolVLA 级基座上的 LoRA（训练 <24GB）与 base+experts 的 fp16 推理
+  （部署 ≤8GB）都严格落在硬预算内。
 
-**Method sketch (to be validated in MuJoCo first)**
+**方法草图（先在 MuJoCo 验证）**
 
-1. **Per-task LoRA expert accumulation** — each new task trains a rank-16 LoRA expert
-   on a frozen backbone; a small router selects/combines experts per task embedding.
-2. **Novelty-gated replay** — a memory buffer stores anchor episodes; writes are gated
-   by novelty/conflict scores (a new coupling — the research claim), replay trains the
-   current expert against buffer + new data.
-3. **Baselines behind the same `ContinualAdapter` interface** — joint training,
-   well-tuned experience replay, LoRA-only; plus an in-context causal-memory arm
-   (Zeva-style, zero-gradient) as a comparison.
-4. **Metrics** — success per task over the stream, forgetting / backward transfer,
-   forward transfer; OOD-instruction robustness as a secondary axis (motivated by the
-   fresh negative result that replay alone leaves OOD drift, arXiv 2611.31511).
+1. **任务级 LoRA 专家累积**——每个新任务在冻结基座上训一个 rank-16 LoRA 专家；
+   小路由器按任务嵌入选择/组合专家。
+2. **新颖度门控回放**——记忆缓冲存锚点 episode；写入由新颖度/冲突分数把关
+   （这个耦合就是研究点），回放时用缓冲 + 新数据训练当前专家。
+3. **同一 `ContinualAdapter` 接口下的基线**——联合训练、调好的经验回放、仅 LoRA；
+   另加上下文因果记忆臂（Zeva 式、零梯度）作对比。
+4. **指标**——任务流上的逐任务成功率、遗忘 / 反向迁移、正向迁移；OOD 指令鲁棒性
+   作次要轴（动机：最新负结果表明仅回放挡不住 OOD 漂移，arXiv 2611.31511）。
 
-**Benchmark contribution** — a sequential-task protocol on MuJoCo SO-101 twin + real
-arm (2–5 tasks × 30 episodes teleop), with fixed stream order and seeds. The protocol
-itself is a deliverable (real-arm CL benchmarks are scarce).
+**Benchmark 贡献**——MuJoCo SO-101 twin + 真机上的顺序任务协议（2–5 任务 ×
+30 eps 遥操作），固定任务流顺序与种子。协议本身即交付物（真机 CL benchmark 稀缺）。
 
-## Supporting piece: from-scratch mini-VLA
+## 配套件：从零 mini-VLA
 
-A deliberately small VLA (ViT-tiny + small fusion transformer + flow-matching action
-head + action chunking, ~10–25M params) implemented as a LeRobot `PreTrainedPolicy`
-subclass. Purpose: (a) mastery of every component for interviews, (b) a cheap testbed
-for continual-learning ablations before touching SmolVLA. Swappable action heads
-(flow / diffusion / discrete tokens) give the "three heads, one trunk" interview demo.
+刻意做小的 VLA（ViT-tiny + 小型融合 transformer + flow-matching 动作头 + 动作分块，
+约 10–25M 参数），实现为 LeRobot `PreTrainedPolicy` 子类。目的：（a）面试用的组件
+级掌控；（b）持续学习消融的廉价试验床（先于 SmolVLA）。动作头可换
+（flow / diffusion / discrete tokens），得到"一躯干三头"的面试演示。
 
-## Deployment track (before the research track ships)
+## 部署轨（研究轨交付前完成）
 
-ONNX fp16/int8 export + latency/VRAM tables on the 8 GB x86 target; optional Zenoh
-remote-inference split (policy server on cloud GPU). This doubles as the "deployment /
-inference acceleration" interview story (the junior-vs-mid separator in JDs).
+ONNX fp16/int8 导出 + 8GB x86 目标机上的延迟/显存表；可选 Zenoh 远程推理拆分
+（策略服务器在云 GPU）。这同时是"部署 / 推理加速"的面试故事（JD 里初/中级的分水岭）。
 
-## Timeline (indicative)
+## 时间线（示意）
 
-| Phase | Content | Est. |
+| 阶段 | 内容 | 预估 |
 |---|---|---|
-| v0.2 | mini-VLA + interview doc series | 1.5–2 weeks |
-| v0.3 | continual-learning track + benchmark protocol | 2–3 weeks |
-| v0.4 | deployment hardening (ONNX/int8, latency table) | 1 week |
-| v0.5+ | pi0.5-LoRA LIBERO training record, blog series, extra baseline rows | continuous |
+| v0.2 | mini-VLA + 面试文档系列 | 1.5–2 周 |
+| v0.3 | 持续学习轨 + benchmark 协议 | 2–3 周 |
+| v0.4 | 部署强化（ONNX/int8、延迟表） | 1 周 |
+| v0.5+ | pi0.5-LoRA LIBERO 训练记录、博客系列、补充基线行 | 持续 |
 
-## Key references
+## 关键参考
 
-- CORAL (arXiv 2603.09298), CLARE (arXiv 2601.09512) — LoRA expert accumulation
-- Memory Anchors (arXiv 2608.26545) — selective replay
-- Real-world 10-task continual-VLA benchmark (arXiv 2605.26820) — ER > joint training
-- OOD drift despite near-zero forgetting (arXiv 2611.31511) — open problem
-- Zeva / in-context causal learning (arXiv 2608.30880) — zero-gradient comparison arm
-- InteractVLA (arXiv 2611.22584) — recursive self-improvement framing
+- CORAL（arXiv 2603.09298）、CLARE（arXiv 2601.09512）— LoRA 专家累积
+- Memory Anchors（arXiv 2608.26545）— 选择性回放
+- 真机 10 任务持续学习 benchmark（arXiv 2605.26820）— ER > 联合训练
+- 近零遗忘仍 OOD 漂移（arXiv 2611.31511）— 开放问题
+- Zeva / 上下文因果学习（arXiv 2608.30880）— 零梯度对比臂
+- InteractVLA（arXiv 2611.22584）— 递归自我改进（RSI）叙事

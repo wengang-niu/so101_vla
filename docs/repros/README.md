@@ -1,18 +1,17 @@
-# Classic VLA reproductions — showcase records
+# 经典 VLA 复现 — 展示记录
 
-These are **records of reproductions** (recipes, runs, results, lessons), not
-reimplementation code. Each doc is structured for interview use:
+这里是**复现记录**（配方、运行、结果、心得），不是重实现代码。每篇文档按面试使用组织：
 
-1. **Background** — one-paragraph algorithm summary + paper reference + how interviewers ask about it
-2. **Environment & data** — setup, dataset (secrets redacted to placeholders)
-3. **Training recipe** — copy-pasteable commands, hyperparameter table, GPU-memory budget
-4. **Inference / real robot** — rollout commands, camera/port configuration notes
-5. **Results & retrospective** — curves, demos, success numbers, pitfalls worth talking about
-6. **Component breakdown** — encoder / action head / loss / inference loop in my own words (interview answers)
+1. **背景** — 一段话讲清算法 + 论文引用 + 面试官常怎么问
+2. **环境与数据** — 搭建、数据集（密钥一律脱敏为占位符）
+3. **训练配方** — 可复制的命令、超参表、显存预算
+4. **推理 / 真机** — rollout 命令、相机/端口配置要点
+5. **结果与复盘** — 曲线、演示、成功率、踩过的坑（面试谈资）
+6. **组件拆解** — 编码器 / 动作头 / 损失 / 推理循环，用自己的话表述（面试答案）
 
-| Doc | Algorithm | Status |
+| 文档 | 算法 | 状态 |
 |---|---|---|
-| [act.md](act.md) | ACT — action chunking with transformers (CVAE + temporal ensembling) | trained + real-robot rollout |
-| [smolvla.md](smolvla.md) | SmolVLA — 0.5B VLA with flow-matching action expert | full-train + finetune + real-robot rollout |
-| [pi0.md](pi0.md) | pi0 — flow-matching action expert on a VLM backbone | full-train + LoRA finetune (inference TODO) |
-| `pi05_lora_libero.md` | pi0.5-LoRA on LIBERO (parity band 96.9–97.5%) | planned (v0.5+) |
+| [act.md](act.md) | ACT — 用 transformer 做动作分块（CVAE + 时序集成） | 已训练 + 真机 rollout |
+| [smolvla.md](smolvla.md) | SmolVLA — 0.5B VLA + flow-matching 动作专家 | 从零训练 + 微调 + 真机 rollout |
+| [pi0.md](pi0.md) | pi0 — VLM 基座 + flow-matching 动作专家 | 全量训练 + LoRA 微调（推理待补） |
+| `pi05_lora_libero.md` | pi0.5-LoRA on LIBERO（对标 96.9–97.5%） | 计划中（v0.5+） |

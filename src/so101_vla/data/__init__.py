@@ -1,1 +1,1 @@
-"""Dataset utilities: normalization stats, camera/joint time alignment, sanity checks."""
+"""数据集工具：归一化统计、相机/关节时间对齐、数据集自检。"""

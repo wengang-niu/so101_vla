@@ -1,8 +1,7 @@
-"""Scan every tracked text file for credential-shaped strings.
+"""扫描所有被 git 跟踪的文本文件，拒绝任何密钥形状的字符串。
 
-Run automatically in CI and via pre-commit. This is a hard gate: a single hit
-fails the build. Patterns are generic on purpose (HF tokens, W&B keys, OpenAI-style
-keys, AWS access keys, private-key blocks).
+在 CI 与 pre-commit 中自动运行，是硬门禁：命中一条就让构建失败。规则刻意写得通用
+（HF token、W&B key、OpenAI 风格 key、AWS access key、私钥块）。
 """
 
 from __future__ import annotations
