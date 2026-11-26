@@ -1,0 +1,40 @@
+# Secrets and private notes — never commit
+.env
+.env.*
+notes-private/
+*.pem
+*.key
+
+# Training / eval artifacts (root-anchored so src/.../data/ packages are not ignored)
+/outputs/
+/runs/
+/wandb/
+/data/
+/checkpoints/
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+*.onnx
+*.engine
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Editors / OS
+.idea/
+.vscode/
+.DS_Store
+
+# Jupyter
+.ipynb_checkpoints/
