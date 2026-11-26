@@ -324,6 +324,64 @@ lerobot-train \
 
 ## 设计
 
+### 整体架构（一次前向：观测 → 动作块）
+
+```mermaid
+flowchart TB
+    IM["图像观测：top + wrist 双相机<br/>每路 [B, 3, 224, 224]"]
+    TXT["任务文本<br/>如 Put the toy on the plate"]
+    STATE["关节状态 qpos [B, 6]"]
+
+    subgraph ENC["① 编码"]
+        direction LR
+        VIT["视觉编码器 ViT-tiny<br/>两相机各自 patch embed，加相机 ID 嵌入<br/>→ 视觉 token [B, N, D]"]
+        LANG["语言编码器：小型 transformer<br/>→ 定长 16 语言 token [B, 16, D]"]
+    end
+
+    FUS["② 融合<br/>50 个可学习 action-query token（每个对应未来一步）<br/>对「视觉 + 语言 + qpos」做 cross-attention<br/>pi0 式 decoder block × 4<br/>→ 上下文向量 [B, 50, D]"]
+
+    subgraph HEAD["③ 动作头：flow matching"]
+        direction TB
+        NOISE["当前噪声动作块 x_t [B, 50, 6]"]
+        VEL["速度场网络 v̂(x_t, t, 上下文)<br/>预测每个时刻的动作方向"]
+        INT["Euler 积分约 10 步<br/>x_next = x + v̂ · dt"]
+    end
+
+    OUT["④ 输出<br/>动作块 [B, 50, 6] = 50 步 × 6 关节<br/>→ 时序集成平滑 → 30Hz 执行"]
+
+    IM --> VIT
+    TXT --> LANG
+    VIT --> FUS
+    LANG --> FUS
+    STATE --> FUS
+    FUS --> VEL
+    NOISE --> VEL
+    VEL --> INT
+    INT --> OUT
+```
+
+### flow matching 动作头：训练 vs 推理
+
+```mermaid
+flowchart TB
+    subgraph T["训练（数据集里有真实动作块）"]
+        GT["真实动作块 x1"]
+        IP["随机采 t，线性插值<br/>x_t = (1 - t)·x0 + t·x1，其中 x0 是纯噪声<br/>监督目标：速度 = x1 - x0"]
+        LOSS["损失 = 预测速度与目标速度的 MSE"]
+    end
+    subgraph I["推理（没有真值）"]
+        Z["从纯噪声 x0 出发"]
+        ST["约 10 步 Euler 积分<br/>每步用速度场 v̂ 修正方向"]
+        ACT["落到动作块 x1，交给时序集成"]
+    end
+    GT --> IP --> LOSS
+    Z --> ST --> ACT
+```
+
+一句话：**训练**是"给噪声和真值的插值，学它们之间的速度方向"；**推理**是"从噪声出发，沿着学到的速度场走 10 步，就走到一个合理动作块"。
+
+### 组件表
+
 | 组件 | 方案 |
 |---|---|
 | 视觉编码 | ViT-tiny，多相机 token（含相机 ID 嵌入） |
