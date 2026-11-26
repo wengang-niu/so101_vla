@@ -1,0 +1,111 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="640" viewBox="0 0 1280 640">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#333"/>
+    </marker>
+    <marker id="arrd" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#777"/>
+    </marker>
+  </defs>
+  <rect x="0" y="0" width="1280" height="640" fill="#FFFFFF"/>
+  <g font-family="LXGW WenKai, FandolHei, sans-serif" fill="#222">
+
+    <!-- title -->
+    <text x="24" y="42" font-size="21" font-weight="700">miniVLA 算法框架：从观测到动作</text>
+
+    <!-- group labels -->
+    <text x="104" y="80" font-size="13" fill="#666" font-weight="700">输入</text>
+    <text x="340" y="80" font-size="13" fill="#666" font-weight="700">① 编码</text>
+    <text x="612" y="80" font-size="13" fill="#666" font-weight="700">② 融合</text>
+    <text x="866" y="80" font-size="13" fill="#666" font-weight="700">③ 动作生成</text>
+    <text x="1146" y="80" font-size="13" fill="#666" font-weight="700">输出</text>
+
+    <!-- input boxes -->
+    <rect x="24" y="92" width="190" height="96" rx="10" fill="#DCE9F7" stroke="#9DC3E6"/>
+    <text x="42" y="122" font-size="15" font-weight="700">观测图像</text>
+    <text x="42" y="147" font-size="12.5">top + wrist 双相机</text>
+    <text x="42" y="170" font-size="12.5">640×480 @ 30fps</text>
+    <rect x="152" y="103" width="28" height="21" rx="3" fill="#9DC3E6"/>
+    <rect x="152" y="131" width="28" height="21" rx="3" fill="#B6D7A8"/>
+
+    <rect x="24" y="214" width="190" height="84" rx="10" fill="#E8F2DC" stroke="#B6D7A8"/>
+    <text x="42" y="244" font-size="15" font-weight="700">任务文本</text>
+    <text x="42" y="270" font-size="11.5">"Put the toy on the plate"</text>
+
+    <rect x="24" y="322" width="190" height="68" rx="10" fill="#FDE8CE" stroke="#F4B183"/>
+    <text x="42" y="350" font-size="15" font-weight="700">关节状态 qpos</text>
+    <text x="42" y="374" font-size="12.5">6 维关节角度</text>
+
+    <!-- encoder boxes -->
+    <rect x="264" y="92" width="200" height="96" rx="10" fill="#CFE2F3" stroke="#6FA8DC"/>
+    <text x="282" y="122" font-size="14.5" font-weight="700">视觉编码器 ViT-tiny</text>
+    <text x="282" y="147" font-size="12">patch embed + 相机 ID</text>
+    <text x="282" y="170" font-size="12">→ 视觉 token 序列</text>
+
+    <rect x="264" y="214" width="200" height="84" rx="10" fill="#D9EAD3" stroke="#93C47D"/>
+    <text x="282" y="244" font-size="14.5" font-weight="700">语言编码器</text>
+    <text x="282" y="268" font-size="12">小型 transformer</text>
+    <text x="282" y="290" font-size="12">→ 16 个定长语言 token</text>
+
+    <!-- fusion box -->
+    <rect x="514" y="92" width="240" height="298" rx="10" fill="#FCE5CD" stroke="#F4B183"/>
+    <text x="532" y="124" font-size="15.5" font-weight="700">动作查询融合</text>
+    <text x="532" y="158" font-size="12.5">50 个可学习的</text>
+    <text x="532" y="180" font-size="12.5">action-query token</text>
+    <text x="532" y="202" font-size="12">（每个对应未来一步）</text>
+    <text x="532" y="238" font-size="12">对「视觉 + 语言 + qpos」</text>
+    <text x="532" y="260" font-size="12">做 cross-attention</text>
+    <text x="532" y="282" font-size="12">（pi0 式 decoder ×4 层）</text>
+    <text x="532" y="322" font-size="13" font-weight="700">→ 上下文特征</text>
+    <text x="532" y="344" font-size="12">每个未来时刻一份</text>
+
+    <!-- action head box -->
+    <rect x="804" y="92" width="220" height="298" rx="10" fill="#DDD3EC" stroke="#B4A7D6"/>
+    <text x="822" y="124" font-size="14.5" font-weight="700">动作头：flow matching</text>
+    <text x="822" y="158" font-size="12.5">速度场网络 v(x_t, t)</text>
+    <text x="822" y="180" font-size="12">输入：噪声动作块 + 上下文</text>
+    <text x="822" y="218" font-size="12.5" font-weight="700">训练</text>
+    <text x="822" y="240" font-size="12">真值与噪声按 t 插值，</text>
+    <text x="822" y="261" font-size="12">学「噪声 → 真值」的流向</text>
+    <text x="822" y="299" font-size="12.5" font-weight="700">推理</text>
+    <text x="822" y="321" font-size="12">从纯噪声沿速度场</text>
+    <text x="822" y="342" font-size="12">Euler 积分约 10 步</text>
+
+    <!-- output -->
+    <rect x="1064" y="92" width="192" height="132" rx="10" fill="#E2EFDA" stroke="#93C47D"/>
+    <text x="1082" y="122" font-size="15.5" font-weight="700">动作块</text>
+    <text x="1082" y="146" font-size="12.5">50 步 × 6 关节</text>
+    <path d="M1082 205 L1104 182 L1126 194 L1148 162 L1170 176 L1192 152 L1214 168 L1238 158"
+          fill="none" stroke="#2E7D32" stroke-width="2"/>
+
+    <rect x="1064" y="252" width="192" height="80" rx="10" fill="#E2EFDA" stroke="#93C47D"/>
+    <text x="1082" y="284" font-size="14.5" font-weight="700">时序集成平滑</text>
+    <text x="1082" y="309" font-size="12">重叠块加权平均</text>
+
+    <rect x="1064" y="438" width="192" height="82" rx="10" fill="#FFF2CC" stroke="#FFD966"/>
+    <text x="1080" y="470" font-size="13.5" font-weight="700">SO-101 执行（30Hz）</text>
+    <text x="1080" y="495" font-size="11">执行几步后重新生成（闭环）</text>
+
+    <!-- arrows -->
+    <line x1="214" y1="140" x2="260" y2="140" stroke="#333" stroke-width="1.8" marker-end="url(#arr)"/>
+    <line x1="214" y1="256" x2="260" y2="256" stroke="#333" stroke-width="1.8" marker-end="url(#arr)"/>
+    <line x1="464" y1="140" x2="510" y2="140" stroke="#333" stroke-width="1.8" marker-end="url(#arr)"/>
+    <line x1="464" y1="256" x2="510" y2="256" stroke="#333" stroke-width="1.8" marker-end="url(#arr)"/>
+    <line x1="214" y1="356" x2="510" y2="356" stroke="#333" stroke-width="1.8" marker-end="url(#arr)"/>
+    <text x="352" y="346" font-size="11.5" fill="#555">qpos 直通</text>
+
+    <line x1="754" y1="235" x2="800" y2="235" stroke="#333" stroke-width="1.8" marker-end="url(#arr)"/>
+    <text x="756" y="222" font-size="11" fill="#555">上下文</text>
+
+    <line x1="1024" y1="152" x2="1060" y2="152" stroke="#333" stroke-width="1.8" marker-end="url(#arr)"/>
+
+    <line x1="1160" y1="224" x2="1160" y2="248" stroke="#333" stroke-width="1.8" marker-end="url(#arr)"/>
+    <line x1="1160" y1="332" x2="1160" y2="434" stroke="#333" stroke-width="1.8" marker-end="url(#arr)"/>
+
+    <!-- feedback loop -->
+    <path d="M1064 480 C 950 545 890 500 908 396" fill="none" stroke="#777" stroke-width="1.8"
+          stroke-dasharray="7 5" marker-end="url(#arrd)"/>
+    <text x="884" y="562" font-size="11.5" fill="#777">闭环：执行几步回来重新生成</text>
+
+  </g>
+</svg>
