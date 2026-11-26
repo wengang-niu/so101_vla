@@ -90,8 +90,9 @@ lerobot-record \
 
 采集演示：
 
-<video src="https://raw.githubusercontent.com/wengang-niu/so101_vla/main/media/data_collection.mp4" controls width="720"></video>
-（[视频文件](media/data_collection.mp4)）
+![数据采集演示](media/data_collection.gif)
+
+（动图；完整视频：[data_collection.mp4](media/data_collection.mp4)）
 
 ## 5. 数据格式（LeRobotDataset v3.0）
 
@@ -164,8 +165,9 @@ lerobot-rollout \
 
 真机演示（ACT）：
 
-<video src="https://raw.githubusercontent.com/wengang-niu/so101_vla/main/media/act_infer.mp4" controls width="720"></video>
-（[视频文件](media/act_infer.mp4)）
+![ACT 真机演示](media/act_infer.gif)
+
+（动图；完整视频：[act_infer.mp4](media/act_infer.mp4)）
 
 ### 9.2 SmolVLA
 
@@ -232,8 +234,9 @@ lerobot-rollout \
 
 真机演示（SmolVLA）：
 
-<video src="https://raw.githubusercontent.com/wengang-niu/so101_vla/main/media/smolvla_infer.mp4" controls width="720"></video>
-（[视频文件](media/smolvla_infer.mp4)）
+![SmolVLA 真机演示](media/smolvla_infer.gif)
+
+（动图；完整视频：[smolvla_infer.mp4](media/smolvla_infer.mp4)）
 
 ### 9.3 pi0
 
